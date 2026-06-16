@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#0a0a1a" />
   <link rel="manifest" href="../manifest.json" />
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="creator.css" />
   <title>Sword Art Online — Aincrad</title>
 </head>
 <body>
@@ -18,9 +19,29 @@
     <div class="title-content">
       <h1 class="game-title">SWORD ART<br><span>ONLINE</span></h1>
       <p class="subtitle">— Aincrad Chronicles —</p>
-      <button id="btn-start" class="btn-primary">▶ COMMENCER</button>
+      <button id="btn-start" class="btn-primary">▶ NOUVELLE PARTIE</button>
       <button id="btn-continue" class="btn-secondary" style="display:none">↺ CONTINUER</button>
     </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       ÉCRAN CRÉATION PERSONNAGE
+  ═══════════════════════════════════════════ -->
+  <div id="screen-create" class="screen">
+    <!-- Contenu généré par character.js -->
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       ÉCRAN ANIMATION ENTRÉE
+  ═══════════════════════════════════════════ -->
+  <div id="screen-entry" class="screen">
+    <canvas id="entry-canvas"></canvas>
+    <div class="entry-text-wrap" id="entry-text-wrap">
+      <div id="entry-line1">BIENVENUE DANS</div>
+      <div id="entry-line2">SWORD ART<br><span>ONLINE</span></div>
+      <div id="entry-line3">— AINCRAD —</div>
+    </div>
+    <div id="entry-flash"></div>
   </div>
 
   <!-- ═══════════════════════════════════════════
@@ -58,15 +79,11 @@
 
     <!-- HUD BAS -->
     <div id="hud-bottom">
-
-      <!-- JOYSTICK GAUCHE -->
       <div id="joystick-zone">
         <div id="joystick-base">
           <div id="joystick-knob"></div>
         </div>
       </div>
-
-      <!-- BOUTONS D'ACTION DROITE -->
       <div id="action-buttons">
         <div id="skills-row">
           <button class="btn-skill" id="btn-skill1" data-skill="0">
@@ -87,21 +104,16 @@
         </div>
         <div id="main-buttons-row">
           <button class="btn-dodge" id="btn-dodge">
-            <span>💨</span>
-            <small>Esquive</small>
+            <span>💨</span><small>Esquive</small>
           </button>
           <button class="btn-attack" id="btn-attack">
-            <span>⚔️</span>
-            <small>Attaque</small>
+            <span>⚔️</span><small>Attaque</small>
           </button>
         </div>
       </div>
-
     </div>
 
-    <!-- BOUTON MENU IN-GAME -->
     <button id="btn-menu-ingame">☰</button>
-
   </div>
 
   <!-- ═══════════════════════════════════════════
@@ -130,8 +142,11 @@
   <!-- SCRIPTS -->
   <script src="save.js"></script>
   <script src="inventory.js"></script>
+  <script src="character.js"></script>
   <script src="player.js"></script>
   <script src="enemy.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
+HTMLEOF
+echo "OK"
