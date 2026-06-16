@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0a0a1a" />
+  <link rel="manifest" href="../manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+  <title>Sword Art Online — Aincrad</title>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════
+       ÉCRAN TITRE
+  ═══════════════════════════════════════════ -->
+  <div id="screen-title" class="screen active">
+    <div class="title-bg"></div>
+    <div class="title-content">
+      <h1 class="game-title">SWORD ART<br><span>ONLINE</span></h1>
+      <p class="subtitle">— Aincrad Chronicles —</p>
+      <button id="btn-start" class="btn-primary">▶ COMMENCER</button>
+      <button id="btn-continue" class="btn-secondary" style="display:none">↺ CONTINUER</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       ÉCRAN JEU
+  ═══════════════════════════════════════════ -->
+  <div id="screen-game" class="screen">
+
+    <!-- HUD HAUT -->
+    <div id="hud-top">
+      <div id="hud-left">
+        <div class="hud-name" id="hud-player-name">Kirito</div>
+        <div class="bar-wrap">
+          <div class="bar-label">HP</div>
+          <div class="bar-bg"><div id="bar-hp" class="bar bar-hp"></div></div>
+          <span id="txt-hp">100/100</span>
+        </div>
+        <div class="bar-wrap">
+          <div class="bar-label">XP</div>
+          <div class="bar-bg"><div id="bar-xp" class="bar bar-xp"></div></div>
+          <span id="txt-xp">0/100</span>
+        </div>
+      </div>
+      <div id="hud-right">
+        <div class="hud-floor">Floor <span id="txt-floor">1</span></div>
+        <div class="hud-level">Lv.<span id="txt-level">1</span></div>
+        <div class="hud-gold">🪙 <span id="txt-gold">0</span></div>
+      </div>
+    </div>
+
+    <!-- CANVAS PRINCIPAL -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- MESSAGES FLOTTANTS -->
+    <div id="float-messages"></div>
+
+    <!-- HUD BAS -->
+    <div id="hud-bottom">
+
+      <!-- JOYSTICK GAUCHE -->
+      <div id="joystick-zone">
+        <div id="joystick-base">
+          <div id="joystick-knob"></div>
+        </div>
+      </div>
+
+      <!-- BOUTONS D'ACTION DROITE -->
+      <div id="action-buttons">
+        <div id="skills-row">
+          <button class="btn-skill" id="btn-skill1" data-skill="0">
+            <span class="skill-icon">⚡</span>
+            <span class="skill-name">Sonic</span>
+            <div class="skill-cd" id="cd-skill1"></div>
+          </button>
+          <button class="btn-skill" id="btn-skill2" data-skill="1">
+            <span class="skill-icon">🌀</span>
+            <span class="skill-name">Spin</span>
+            <div class="skill-cd" id="cd-skill2"></div>
+          </button>
+          <button class="btn-skill" id="btn-skill3" data-skill="2">
+            <span class="skill-icon">💥</span>
+            <span class="skill-name">Burst</span>
+            <div class="skill-cd" id="cd-skill3"></div>
+          </button>
+        </div>
+        <div id="main-buttons-row">
+          <button class="btn-dodge" id="btn-dodge">
+            <span>💨</span>
+            <small>Esquive</small>
+          </button>
+          <button class="btn-attack" id="btn-attack">
+            <span>⚔️</span>
+            <small>Attaque</small>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BOUTON MENU IN-GAME -->
+    <button id="btn-menu-ingame">☰</button>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       ÉCRAN GAME OVER
+  ═══════════════════════════════════════════ -->
+  <div id="screen-gameover" class="screen">
+    <div class="gameover-content">
+      <h2>— GAME OVER —</h2>
+      <p>Votre aventure s'arrête ici.</p>
+      <button id="btn-retry" class="btn-primary">↺ RÉESSAYER</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       ÉCRAN LEVEL UP
+  ═══════════════════════════════════════════ -->
+  <div id="screen-levelup" class="screen overlay">
+    <div class="levelup-content">
+      <div class="levelup-title">LEVEL UP!</div>
+      <div class="levelup-level" id="levelup-num">Niveau 2</div>
+      <div class="levelup-stats" id="levelup-stats"></div>
+      <button id="btn-levelup-ok" class="btn-primary">OK</button>
+    </div>
+  </div>
+
+  <!-- SCRIPTS -->
+  <script src="save.js"></script>
+  <script src="inventory.js"></script>
+  <script src="player.js"></script>
+  <script src="enemy.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
