@@ -1,15 +1,18 @@
 /* ═══════════════════════════════════════════════════════
    GAME.JS — Boucle principale, input, caméra, rendu
+   + intégration CharacterCreator + auto-save
 ═══════════════════════════════════════════════════════ */
 
 const Game = (() => {
 
   // ── ÉLÉMENTS DOM ────────────────────────────────────
-  const canvas   = document.getElementById('game-canvas');
-  const ctx      = canvas.getContext('2d');
+  const canvas = document.getElementById('game-canvas');
+  const ctx    = canvas.getContext('2d');
 
   const screens = {
     title   : document.getElementById('screen-title'),
+    create  : document.getElementById('screen-create'),
+    entry   : document.getElementById('screen-entry'),
     game    : document.getElementById('screen-game'),
     gameover: document.getElementById('screen-gameover'),
     levelup : document.getElementById('screen-levelup'),
@@ -23,6 +26,7 @@ const Game = (() => {
     txtFloor: document.getElementById('txt-floor'),
     txtLevel: document.getElementById('txt-level'),
     txtGold : document.getElementById('txt-gold'),
+    name    : document.getElementById('hud-player-name'),
   };
 
   // ── ÉTAT DU JEU ─────────────────────────────────────
@@ -32,33 +36,26 @@ const Game = (() => {
   let rafId    = null;
   let running  = false;
   let floorCleared = false;
-  let floorTransTimer = 0;
+  let appearance   = null;   // données apparence personnage
 
-  // ── CAMÉRA ──────────────────────────────────────────
   const cam = { x: 0, y: 0 };
   const WORLD_W = 1200;
   const WORLD_H = 900;
 
   // ── INPUT JOYSTICK ──────────────────────────────────
   const joystick = {
-    active : false,
-    touchId: null,
-    baseX  : 0, baseY: 0,
-    knobX  : 0, knobY: 0,
-    dx     : 0, dy   : 0,
-    maxR   : 38,
+    active: false, touchId: null,
+    baseX: 0, baseY: 0,
+    knobX: 0, knobY: 0,
+    dx: 0, dy: 0, maxR: 38,
   };
 
-  // ── INPUT CLAVIER (desktop) ─────────────────────────
   const keys = {};
   window.addEventListener('keydown', e => { keys[e.key] = true; });
   window.addEventListener('keyup',   e => { keys[e.key] = false; });
 
-  // ── PARTICULES MONDE ────────────────────────────────
-  let worldParticles = [];
-
   // ────────────────────────────────────────────────────
-  //  SHOW / HIDE SCREENS
+  //  AFFICHAGE ÉCRANS
   // ────────────────────────────────────────────────────
   function showScreen(name) {
     Object.values(screens).forEach(s => s.classList.remove('active'));
@@ -66,30 +63,56 @@ const Game = (() => {
   }
 
   // ────────────────────────────────────────────────────
-  //  DÉMARRER / INITIALISER
+  //  FLUX DE DÉMARRAGE
   // ────────────────────────────────────────────────────
-  function init() {
+  function startNewGame() {
+    // Première fois : affiche le créateur de personnage
+    CharacterCreator.show(screens.create, (charData) => {
+      // Sauvegarde l'apparence
+      SaveManager.saveAppearance(charData);
+      appearance = charData;
+      // Remet une save fraîche avec le bon nom
+      SaveManager.clear();
+      const fresh = SaveManager.defaultSave();
+      fresh.playerName = charData.name;
+      SaveManager.save(fresh);
+      // Lance le jeu
+      initGame(fresh);
+    });
+    showScreen('create');
+  }
+
+  function continueGame() {
+    appearance = SaveManager.loadAppearance();
     const saveData = SaveManager.load();
+    initGame(saveData);
+  }
+
+  // ────────────────────────────────────────────────────
+  //  INITIALISATION DU JEU
+  // ────────────────────────────────────────────────────
+  function initGame(saveData) {
     player = new Player(saveData);
-    player.x = canvas.width  / 2;
-    player.y = canvas.height / 2;
+    player.appearance = appearance;
+    player.x = WORLD_W / 2;
+    player.y = WORLD_H * 0.75;
 
-    enemies  = [];
-    worldParticles = [];
-    floorCleared   = false;
-
+    enemies = [];
+    floorCleared = false;
     spawnFloor();
+
+    // Auto-save toutes les 30s
+    SaveManager.startAutoSave(() => player ? player.toSaveData() : null, 30000);
+    // Sauvegarde si on quitte
+    SaveManager.bindUnloadSave(() => player ? player.toSaveData() : null);
+
     showScreen('game');
     updateHUD();
     if (!running) startLoop();
   }
 
   function spawnFloor() {
-    enemies = Enemy.spawnWave(
-      player.floor,
-      WORLD_W, WORLD_H,
-      WORLD_W / 2, WORLD_H / 2
-    );
+    enemies = Enemy.spawnWave(player.floor, WORLD_W, WORLD_H, WORLD_W/2, WORLD_H/2);
     floorCleared = false;
     player.x = WORLD_W / 2;
     player.y = WORLD_H * 0.75;
@@ -112,10 +135,8 @@ const Game = (() => {
   function loop(timestamp) {
     const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
     lastTime = timestamp;
-
     update(dt);
     render();
-
     if (running) rafId = requestAnimationFrame(loop);
   }
 
@@ -125,62 +146,44 @@ const Game = (() => {
   function update(dt) {
     if (!player) return;
 
-    // ── Input joystick + clavier ──
     let ix = joystick.dx;
     let iy = joystick.dy;
-
     if (keys['ArrowLeft']  || keys['a'] || keys['A']) ix -= 1;
     if (keys['ArrowRight'] || keys['d'] || keys['D']) ix += 1;
     if (keys['ArrowUp']    || keys['w'] || keys['W']) iy -= 1;
     if (keys['ArrowDown']  || keys['s'] || keys['S']) iy += 1;
-
-    // Normalise
     const len = Math.hypot(ix, iy);
     if (len > 1) { ix /= len; iy /= len; }
 
-    // ── Mise à jour joueur ──
     player.update(dt, ix, iy);
-
-    // ── Clamp dans le monde ──
     player.x = Math.max(player.radius, Math.min(WORLD_W - player.radius, player.x));
     player.y = Math.max(player.radius, Math.min(WORLD_H - player.radius, player.y));
 
-    // ── Caméra ──
-    const targetCamX = player.x - canvas.width  / 2;
-    const targetCamY = player.y - canvas.height / 2;
-    cam.x += (targetCamX - cam.x) * 8 * dt;
-    cam.y += (targetCamY - cam.y) * 8 * dt;
+    // Caméra
+    const tcx = player.x - canvas.width  / 2;
+    const tcy = player.y - canvas.height / 2;
+    cam.x += (tcx - cam.x) * 8 * dt;
+    cam.y += (tcy - cam.y) * 8 * dt;
     cam.x = Math.max(0, Math.min(WORLD_W - canvas.width,  cam.x));
     cam.y = Math.max(0, Math.min(WORLD_H - canvas.height, cam.y));
 
-    // ── Mise à jour ennemis ──
     enemies.forEach(e => e.update(dt, player));
     enemies = enemies.filter(e => !e.canRemove());
 
-    // ── Particules monde ──
-    worldParticles = worldParticles.filter(p => {
-      p.life -= dt;
-      p.x += p.vx * dt; p.y += p.vy * dt;
-      p.vx *= 0.9; p.vy *= 0.9;
-      return p.life > 0;
-    });
-
-    // ── Vérif Game Over ──
     if (player.hp <= 0) {
-      autoSave();
+      SaveManager.save(player.toSaveData());
+      SaveManager.stopAutoSave();
       showScreen('gameover');
       stopLoop();
       return;
     }
 
-    // ── Vérif étage terminé ──
-    const aliveEnemies = enemies.filter(e => e.alive);
-    if (!floorCleared && aliveEnemies.length === 0 && enemies.length > 0) {
+    const alive = enemies.filter(e => e.alive);
+    if (!floorCleared && alive.length === 0 && enemies.length > 0) {
       floorCleared = true;
       setTimeout(nextFloor, 1500);
     }
 
-    // ── Sauvegarde auto toutes les 30s (via compteur) ──
     updateHUD();
   }
 
@@ -188,19 +191,18 @@ const Game = (() => {
     player.floor += 1;
     player.hp = Math.min(player.hp + Math.round(player.effectiveMaxHp * 0.3), player.effectiveMaxHp);
     floatMsg(`🏆 Étage ${player.floor} !`, canvas.width/2, canvas.height/2, 'xp', 28);
-    autoSave();
+    SaveManager.save(player.toSaveData());
     spawnFloor();
     updateHUD();
   }
 
   // ────────────────────────────────────────────────────
-  //  ATTAQUE JOUEUR → ENNEMIS
+  //  COMBAT
   // ────────────────────────────────────────────────────
   function doAttack() {
     if (!player) return;
     const result = player.attack();
     if (!result) return;
-
     enemies.forEach(e => {
       if (!e.alive) return;
       const dist = Math.hypot(e.x - player.x, e.y - player.y);
@@ -216,13 +218,10 @@ const Game = (() => {
     if (!player) return;
     const result = player.useSkill(index);
     if (!result) return;
-
     enemies.forEach(e => {
       if (!e.alive) return;
       const dist = Math.hypot(e.x - player.x, e.y - player.y);
-      const inRange = result.aoe
-        ? dist < 130 + e.radius
-        : dist < result.range + e.radius;
+      const inRange = result.aoe ? dist < 130 + e.radius : dist < result.range + e.radius;
       if (inRange) {
         const dmg = e.takeDamage(result.damage);
         floatMsg(`⚡${dmg}`, e.x, e.y - 20, 'crit');
@@ -233,27 +232,17 @@ const Game = (() => {
   }
 
   function onEnemyKilled(e) {
-    // XP
     const leveled = player.gainXp(e.xpReward);
     floatMsg(`+${e.xpReward} XP`, e.x, e.y - 35, 'xp');
-
-    // Or
     player.gold += e.goldReward;
     floatMsg(`+${e.goldReward}🪙`, e.x + 15, e.y - 20, 'gold');
-
-    // Drop item
     const drop = Inventory.rollDrop(player.floor);
     if (drop) {
       player.inventory.push(drop);
       floatMsg(`⬆ ${drop.rarityLabel} ${drop.name}`, e.x, e.y - 50, 'xp');
     }
-
-    // Level up
-    if (leveled.length > 0) {
-      leveled.forEach(lv => showLevelUp(lv));
-    }
-
-    autoSave();
+    if (leveled.length > 0) leveled.forEach(lv => showLevelUp(lv));
+    SaveManager.save(player.toSaveData());
   }
 
   // ────────────────────────────────────────────────────
@@ -261,74 +250,50 @@ const Game = (() => {
   // ────────────────────────────────────────────────────
   function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     ctx.save();
     ctx.translate(-cam.x, -cam.y);
-
     drawFloor();
-
-    // Ennemis
     enemies.forEach(e => e.draw(ctx, cam.x, cam.y));
-
-    // Joueur
     if (player) player.draw(ctx);
-
-    // Particules monde
-    worldParticles.forEach(p => {
-      ctx.globalAlpha = Math.max(0, p.life);
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      ctx.fillStyle = p.color; ctx.fill();
-    });
-    ctx.globalAlpha = 1;
-
     ctx.restore();
   }
 
-  // ── SOL (damier style donjon) ────────────────────────
   function drawFloor() {
     const TILE = 64;
     const cols = Math.ceil(WORLD_W / TILE);
     const rows = Math.ceil(WORLD_H / TILE);
-
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        const dark = (r + c) % 2 === 0;
-        ctx.fillStyle = dark ? '#0d1020' : '#0f1428';
+        ctx.fillStyle = (r + c) % 2 === 0 ? '#0d1020' : '#0f1428';
         ctx.fillRect(c * TILE, r * TILE, TILE, TILE);
       }
     }
-
-    // Bordure du monde
     ctx.strokeStyle = '#1a3a6a';
     ctx.lineWidth = 4;
     ctx.strokeRect(2, 2, WORLD_W - 4, WORLD_H - 4);
 
-    // Glyphe central (décoration)
     ctx.save();
     ctx.globalAlpha = 0.04;
     ctx.strokeStyle = '#00cfff';
     ctx.lineWidth = 2;
-    const cx = WORLD_W / 2, cy = WORLD_H / 2, r = 120;
+    const cx = WORLD_W/2, cy = WORLD_H/2, r = 120;
     for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
-      ctx.stroke();
+      const a = (i/6)*Math.PI*2;
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      ctx.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r); ctx.stroke();
     }
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, cy, r * 0.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, r*0.5, 0, Math.PI*2); ctx.stroke();
     ctx.restore();
   }
 
   // ────────────────────────────────────────────────────
-  //  HUD & UI
+  //  HUD
   // ────────────────────────────────────────────────────
   function updateHUD() {
     if (!player) return;
     const hpPct = Math.max(0, player.hp / player.effectiveMaxHp) * 100;
     const xpPct = (player.xp / player.xpToNext) * 100;
-
     hud.hp.style.width      = hpPct + '%';
     hud.xp.style.width      = xpPct + '%';
     hud.txtHp.textContent   = `${Math.ceil(player.hp)}/${player.effectiveMaxHp}`;
@@ -336,7 +301,7 @@ const Game = (() => {
     hud.txtFloor.textContent= player.floor;
     hud.txtLevel.textContent= player.level;
     hud.txtGold.textContent = player.gold;
-
+    if (player.playerName) hud.name.textContent = player.playerName;
     updateSkillButtons();
   }
 
@@ -355,128 +320,108 @@ const Game = (() => {
     });
   }
 
-  // ── MESSAGES FLOTTANTS ────────────────────────────
   function floatMsg(text, worldX, worldY, type = 'dmg', size) {
-    const el  = document.createElement('div');
+    const el = document.createElement('div');
     el.className = `float-msg ${type}`;
     el.textContent = text;
     if (size) el.style.fontSize = size + 'px';
-
-    // Convertit coordonnées monde → écran
-    const sx = worldX - cam.x + (Math.random() - 0.5) * 20;
+    const sx = worldX - cam.x + (Math.random()-0.5)*20;
     const sy = worldY - cam.y;
     el.style.left = sx + 'px';
     el.style.top  = sy + 'px';
-
     document.getElementById('float-messages').appendChild(el);
     el.addEventListener('animationend', () => el.remove());
   }
 
-  // ── LEVEL UP OVERLAY ──────────────────────────────
   function showLevelUp(lv) {
     document.getElementById('levelup-num').textContent = `Niveau ${lv}`;
-    document.getElementById('levelup-stats').innerHTML =
-      `ATK +2 &nbsp; DEF +1 &nbsp; SPD +1 &nbsp; HP +15`;
+    document.getElementById('levelup-stats').innerHTML = `ATK +2 &nbsp; DEF +1 &nbsp; SPD +1 &nbsp; HP +15`;
     showScreen('levelup');
     stopLoop();
   }
 
   // ────────────────────────────────────────────────────
-  //  SAUVEGARDE AUTO
-  // ────────────────────────────────────────────────────
-  function autoSave() {
-    if (player) SaveManager.save(player.toSaveData());
-  }
-
-  // ────────────────────────────────────────────────────
-  //  JOYSTICK TACTILE
+  //  JOYSTICK
   // ────────────────────────────────────────────────────
   function initJoystick() {
-    const zone  = document.getElementById('joystick-zone');
-    const base  = document.getElementById('joystick-base');
-    const knob  = document.getElementById('joystick-knob');
+    const zone = document.getElementById('joystick-zone');
+    const base = document.getElementById('joystick-base');
+    const knob = document.getElementById('joystick-knob');
 
     function onStart(e) {
       e.preventDefault();
       const t = e.changedTouches ? e.changedTouches[0] : e;
       if (joystick.active) return;
-      joystick.active  = true;
+      joystick.active = true;
       joystick.touchId = t.identifier ?? 0;
       const rect = base.getBoundingClientRect();
       joystick.baseX = rect.left + rect.width  / 2;
       joystick.baseY = rect.top  + rect.height / 2;
     }
-
     function onMove(e) {
       e.preventDefault();
       if (!joystick.active) return;
-      const touches = e.changedTouches
-        ? Array.from(e.changedTouches)
-        : [e];
+      const touches = e.changedTouches ? Array.from(e.changedTouches) : [e];
       const t = touches.find(t => t.identifier === joystick.touchId) ?? touches[0];
       if (!t) return;
-
       let dx = t.clientX - joystick.baseX;
       let dy = t.clientY - joystick.baseY;
       const dist = Math.hypot(dx, dy);
-      if (dist > joystick.maxR) {
-        dx = (dx / dist) * joystick.maxR;
-        dy = (dy / dist) * joystick.maxR;
-      }
+      if (dist > joystick.maxR) { dx = dx/dist*joystick.maxR; dy = dy/dist*joystick.maxR; }
       joystick.dx = dx / joystick.maxR;
       joystick.dy = dy / joystick.maxR;
-
       knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
     }
-
-    function onEnd(e) {
-      joystick.active = false;
-      joystick.dx = 0; joystick.dy = 0;
+    function onEnd() {
+      joystick.active = false; joystick.dx = 0; joystick.dy = 0;
       knob.style.transform = 'translate(-50%, -50%)';
     }
 
-    zone.addEventListener('touchstart',  onStart, { passive: false });
-    window.addEventListener('touchmove', onMove,  { passive: false });
-    window.addEventListener('touchend',  onEnd);
+    zone.addEventListener('touchstart',    onStart, { passive: false });
+    window.addEventListener('touchmove',   onMove,  { passive: false });
+    window.addEventListener('touchend',    onEnd);
     window.addEventListener('touchcancel', onEnd);
-
-    // Souris pour desktop
-    zone.addEventListener('mousedown',   onStart);
-    window.addEventListener('mousemove', e => { if (joystick.active) onMove(e); });
-    window.addEventListener('mouseup',   onEnd);
+    zone.addEventListener('mousedown',     onStart);
+    window.addEventListener('mousemove',   e => { if (joystick.active) onMove(e); });
+    window.addEventListener('mouseup',     onEnd);
   }
 
   // ────────────────────────────────────────────────────
-  //  RESIZE CANVAS
+  //  RESIZE
   // ────────────────────────────────────────────────────
   function resizeCanvas() {
     canvas.width  = window.innerWidth;
     canvas.height = window.innerHeight;
+    const ec = document.getElementById('entry-canvas');
+    if (ec) { ec.width = window.innerWidth; ec.height = window.innerHeight; }
   }
 
   // ────────────────────────────────────────────────────
   //  BINDINGS BOUTONS
   // ────────────────────────────────────────────────────
   function bindButtons() {
-    // Titre
+    // Titre → Nouvelle partie
     document.getElementById('btn-start').addEventListener('click', () => {
-      SaveManager.clear();
-      init();
+      SaveManager.clearAll();
+      startNewGame();
     });
 
-    const btnContinue = document.getElementById('btn-continue');
-    if (SaveManager.exists()) btnContinue.style.display = '';
-    btnContinue.addEventListener('click', init);
+    // Titre → Continuer
+    const btnCont = document.getElementById('btn-continue');
+    if (SaveManager.exists() && SaveManager.hasCharacter()) {
+      btnCont.style.display = '';
+    }
+    btnCont.addEventListener('click', continueGame);
 
     // Attaque
     const btnAtk = document.getElementById('btn-attack');
     btnAtk.addEventListener('touchstart', e => { e.preventDefault(); doAttack(); }, { passive: false });
-    btnAtk.addEventListener('mousedown',  () => doAttack());
+    btnAtk.addEventListener('mousedown',  doAttack);
 
     // Esquive
     const btnDodge = document.getElementById('btn-dodge');
-    btnDodge.addEventListener('touchstart', e => { e.preventDefault(); if (player) player.dodge(); }, { passive: false });
-    btnDodge.addEventListener('mousedown',  () => { if (player) player.dodge(); });
+    btnDodge.addEventListener('touchstart', e => { e.preventDefault(); if(player) player.dodge(); }, { passive: false });
+    btnDodge.addEventListener('mousedown',  () => { if(player) player.dodge(); });
 
     // Compétences
     [1,2,3].forEach(i => {
@@ -485,13 +430,13 @@ const Game = (() => {
       btn.addEventListener('mousedown',  () => doSkill(i-1));
     });
 
-    // Touche clavier espace = attaque
+    // Clavier
     window.addEventListener('keydown', e => {
-      if (e.code === 'Space') { e.preventDefault(); doAttack(); }
-      if (e.code === 'ShiftLeft') { if (player) player.dodge(); }
-      if (e.code === 'Digit1') doSkill(0);
-      if (e.code === 'Digit2') doSkill(1);
-      if (e.code === 'Digit3') doSkill(2);
+      if (e.code === 'Space')     { e.preventDefault(); doAttack(); }
+      if (e.code === 'ShiftLeft') { if(player) player.dodge(); }
+      if (e.code === 'Digit1')    doSkill(0);
+      if (e.code === 'Digit2')    doSkill(1);
+      if (e.code === 'Digit3')    doSkill(2);
     });
 
     // Level up OK
@@ -505,7 +450,8 @@ const Game = (() => {
       const save = SaveManager.load();
       save.hp = save.maxHp;
       SaveManager.save(save);
-      init();
+      appearance = SaveManager.loadAppearance();
+      initGame(save);
     });
   }
 
@@ -514,16 +460,9 @@ const Game = (() => {
   // ────────────────────────────────────────────────────
   function start() {
     resizeCanvas();
-    window.addEventListener('resize', () => { resizeCanvas(); });
-
+    window.addEventListener('resize', resizeCanvas);
     bindButtons();
     initJoystick();
-
-    // Vérifie si sauvegarde existante
-    if (SaveManager.exists()) {
-      document.getElementById('btn-continue').style.display = '';
-    }
-
     showScreen('title');
   }
 
@@ -533,11 +472,9 @@ const Game = (() => {
 // ── LANCEMENT ────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   Game.start();
-
-  // Enregistrement Service Worker (PWA)
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js')
-      .then(() => console.log('[PWA] Service Worker enregistré'))
+    navigator.serviceWorker.register('../service-worker.js')
+      .then(() => console.log('[PWA] SW enregistré'))
       .catch(err => console.warn('[PWA] SW erreur:', err));
   }
 });
