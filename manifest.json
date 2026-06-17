@@ -2,7 +2,7 @@
   "name": "Sword Art Online — Aincrad Chronicles",
   "short_name": "SAO Aincrad",
   "description": "RPG action mobile inspiré de Sword Art Online. Gravissez les 100 étages d'Aincrad.",
-  "start_url": "./src/index.html",
+  "start_url": "./index.html",
   "display": "fullscreen",
   "orientation": "portrait",
   "background_color": "#0a0a1a",

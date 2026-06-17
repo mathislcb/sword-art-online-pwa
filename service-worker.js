@@ -5,13 +5,15 @@
 const CACHE_NAME = 'sao-aincrad-v1';
 
 const ASSETS = [
-  './src/index.html',
-  './src/style.css',
-  './src/game.js',
-  './src/player.js',
-  './src/enemy.js',
-  './src/inventory.js',
-  './src/save.js',
+  './index.html',
+  './style.css',
+  './creator.css',
+  './game.js',
+  './player.js',
+  './enemy.js',
+  './inventory.js',
+  './save.js',
+  './character.js',
   './manifest.json',
 ];
 

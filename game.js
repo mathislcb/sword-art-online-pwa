@@ -536,7 +536,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Enregistrement Service Worker (PWA)
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('../service-worker.js')
+    navigator.serviceWorker.register('./service-worker.js')
       .then(() => console.log('[PWA] Service Worker enregistré'))
       .catch(err => console.warn('[PWA] SW erreur:', err));
   }
