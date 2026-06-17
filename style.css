@@ -30,7 +30,7 @@ html, body {
   background: var(--c-bg);
   color: var(--c-text);
   font-family: var(--font-body);
-  touch-action: none;
+  touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -143,7 +143,10 @@ html, body {
   position: fixed; inset: 0;
   flex-direction: column;
 }
-#screen-game.active { display: flex; }
+#screen-game.active {
+  display: flex;
+  touch-action: none;
+}
 
 /* CANVAS */
 #game-canvas {
