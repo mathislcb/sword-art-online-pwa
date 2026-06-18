@@ -359,8 +359,8 @@ const Game = (() => {
       joystick.baseY = rect.top  + rect.height / 2;
     }
     function onMove(e) {
-      e.preventDefault();
       if (!joystick.active) return;
+      e.preventDefault();
       const touches = e.changedTouches ? Array.from(e.changedTouches) : [e];
       const t = touches.find(t => t.identifier === joystick.touchId) ?? touches[0];
       if (!t) return;
