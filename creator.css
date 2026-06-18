@@ -7,25 +7,25 @@
    ÉCRAN CRÉATION PERSONNAGE
 ═══════════════════════════════════════════════════════ */
 #screen-create {
-  background: radial-gradient(ellipse at 50% 30%, #0a1a3a 0%, #030308 80%);
-  display: none;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  gap: 0;
-
-  /* Permet le scroll vertical même avec touch-action:none sur body */
   position: fixed;
   inset: 0;
-  overflow-y: scroll;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
-
-  padding: 20px 16px 60px;
-  box-sizing: border-box;
+  display: none;
+  background: radial-gradient(ellipse at 50% 30%, #0a1a3a 0%, #030308 80%);
+  z-index: 10;
 }
 #screen-create.active {
-  display: flex;
+  display: block !important;
+}
+
+/* Wrapper interne : c'est LUI qui scroll, en display block (pas flex) */
+#create-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding: 20px 16px 60px;
+  box-sizing: border-box;
 }
 
 .create-header {

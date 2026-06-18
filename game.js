@@ -67,7 +67,7 @@ const Game = (() => {
   // ────────────────────────────────────────────────────
   function startNewGame() {
     // Première fois : affiche le créateur de personnage
-    CharacterCreator.show(screens.create, (charData) => {
+    CharacterCreator.show(document.getElementById('create-scroll'), (charData) => {
       // Sauvegarde l'apparence
       SaveManager.saveAppearance(charData);
       appearance = charData;
